@@ -151,17 +151,18 @@ class RumbleUploader:
             log.error(f"Error during login: {e}")
             return False
     
-    def upload_video(self, video_path: str, title: str, description: str, 
-                    tags: List[str] = None) -> Dict[str, Any]:
+    def upload_video(self, video_path: str, title: str, description: str,
+                    tags: List[str] = None, channel: str = None) -> Dict[str, Any]:
         """
         Upload video to Rumble
-        
+
         Args:
             video_path: Path to video file
             title: Video title
             description: Video description
             tags: List of tags
-            
+            channel: Channel name to upload to (optional)
+
         Returns:
             Dict with upload result
         """
@@ -191,6 +192,10 @@ class RumbleUploader:
                 result['error'] = "Failed to upload video file"
                 return result
             
+            # Select channel if specified
+            if not self._select_channel(channel or config.RUMBLE_CHANNEL):
+                log.warning("Failed to select channel, continuing with default")
+
             # Fill video details
             if not self._fill_video_details(title, description, tags):
                 result['error'] = "Failed to fill video details"
@@ -244,7 +249,82 @@ class RumbleUploader:
         except Exception as e:
             log.error(f"Error uploading file: {e}")
             return False
-    
+
+    def _select_channel(self, channel_name: str) -> bool:
+        """Select the channel to upload to"""
+        if not channel_name:
+            log.debug("No channel specified, using default")
+            return True
+
+        try:
+            log.info(f"Attempting to select channel: {channel_name}")
+
+            # Look for channel dropdown or selection
+            channel_selectors = [
+                "//select[contains(@name, 'channel')]",
+                "//select[contains(@id, 'channel')]",
+                "//select[contains(@class, 'channel')]",
+                "//div[contains(@class, 'channel-select')]//select",
+                "//div[contains(@class, 'channel-dropdown')]//select"
+            ]
+
+            for selector in channel_selectors:
+                try:
+                    channel_dropdown = self.driver.find_element(By.XPATH, selector)
+                    if channel_dropdown:
+                        # Try to select by visible text
+                        from selenium.webdriver.support.ui import Select
+                        select = Select(channel_dropdown)
+
+                        # Try different ways to select the channel
+                        try:
+                            select.select_by_visible_text(channel_name)
+                            log.info(f"Selected channel by visible text: {channel_name}")
+                            self._human_delay(1, 2)
+                            return True
+                        except:
+                            try:
+                                select.select_by_value(channel_name)
+                                log.info(f"Selected channel by value: {channel_name}")
+                                self._human_delay(1, 2)
+                                return True
+                            except:
+                                # Try partial match
+                                for option in select.options:
+                                    if channel_name.lower() in option.text.lower():
+                                        select.select_by_visible_text(option.text)
+                                        log.info(f"Selected channel by partial match: {option.text}")
+                                        self._human_delay(1, 2)
+                                        return True
+                except:
+                    continue
+
+            # Alternative: Look for channel buttons or links
+            channel_button_selectors = [
+                f"//button[contains(text(), '{channel_name}')]",
+                f"//a[contains(text(), '{channel_name}')]",
+                f"//div[contains(text(), '{channel_name}')][@role='button']",
+                f"//span[contains(text(), '{channel_name}')]/parent::*[@role='button']"
+            ]
+
+            for selector in channel_button_selectors:
+                try:
+                    channel_button = self.driver.find_element(By.XPATH, selector)
+                    if channel_button and channel_button.is_enabled():
+                        channel_button.click()
+                        log.info(f"Selected channel by clicking button: {channel_name}")
+                        self._human_delay(1, 2)
+                        return True
+                except:
+                    continue
+
+            log.warning(f"Could not find channel selector for: {channel_name}")
+            return False
+
+        except Exception as e:
+            log.error(f"Error selecting channel: {e}")
+            return False
+
     def _fill_video_details(self, title: str, description: str, tags: List[str] = None) -> bool:
         """Fill video title, description, and tags"""
         try:

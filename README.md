@@ -7,7 +7,7 @@ A Python-based Telegram bot that automatically uploads videos to Rumble with aut
 - 🤖 **Telegram Integration**: Receives videos via Telegram Bot API
 - 📹 **Video Processing**: Handles files up to 2GB with validation
 - 🎲 **Random Metadata**: Generates titles, descriptions, and tags when not provided
-- 🌐 **Rumble Automation**: Full browser automation for upload process
+- 🌐 **Rumble Automation**: Full browser automation with channel selection
 - ☁️ **Cloud Ready**: Deployable on Heroku, Railway, Render, or VPS
 - 🔒 **Secure**: Environment-based credential management
 - 📊 **Logging**: Comprehensive logging and error handling
@@ -54,9 +54,10 @@ A Python-based Telegram bot that automatically uploads videos to Rumble with aut
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 
-# Rumble Account Credentials  
+# Rumble Account Credentials
 RUMBLE_EMAIL=your_rumble_email@example.com
 RUMBLE_PASSWORD=your_rumble_password_here
+RUMBLE_CHANNEL=your_channel_name_here
 ```
 
 ### Optional Configuration

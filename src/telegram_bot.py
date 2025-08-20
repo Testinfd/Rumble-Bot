@@ -160,7 +160,8 @@ It can be multiple lines.
                 video_path=video_path,
                 title=title,
                 description=description,
-                tags=tags
+                tags=tags,
+                channel=config.RUMBLE_CHANNEL
             )
             
             if upload_result.get('success'):

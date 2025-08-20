@@ -19,6 +19,7 @@ class Config:
     # Rumble Credentials
     RUMBLE_EMAIL: str = os.getenv("RUMBLE_EMAIL", "")
     RUMBLE_PASSWORD: str = os.getenv("RUMBLE_PASSWORD", "")
+    RUMBLE_CHANNEL: Optional[str] = os.getenv("RUMBLE_CHANNEL")  # Channel name to upload to
     
     # Bot Settings
     MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "2048"))
