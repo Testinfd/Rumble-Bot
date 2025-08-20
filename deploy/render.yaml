@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: rumble-bot
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: RUMBLE_EMAIL
+        sync: false
+      - key: RUMBLE_PASSWORD
+        sync: false
+      - key: HEADLESS_MODE
+        value: "true"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: PORT
+        value: "8080"

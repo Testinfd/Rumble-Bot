@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  rumble-bot:
+    build: .
+    container_name: rumble-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - RUMBLE_EMAIL=${RUMBLE_EMAIL}
+      - RUMBLE_PASSWORD=${RUMBLE_PASSWORD}
+      - HEADLESS_MODE=true
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./downloads:/app/downloads
+      - ./temp:/app/temp
+    ports:
+      - "8080:8080"
+    networks:
+      - rumble-bot-network
+
+networks:
+  rumble-bot-network:
+    driver: bridge
