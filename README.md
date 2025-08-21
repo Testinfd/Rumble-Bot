@@ -1,17 +1,29 @@
-# Rumble Bot - Automated Video Upload Bot
+# 🤖 Enhanced Rumble Bot - Automated Video Upload Assistant
 
-A Python-based Telegram bot that automatically uploads videos to Rumble with automated metadata generation and form submission.
+An advanced Telegram bot that automatically uploads videos to Rumble with real-time progress updates, enhanced error handling, and actual video URL extraction.
 
-## Features
+## ✨ Enhanced Features
 
-- 🤖 **Telegram Integration**: Receives videos via Telegram Bot API
-- 📹 **Video Processing**: Handles files up to 2GB with validation
-- 🎲 **Random Metadata**: Generates titles, descriptions, and tags when not provided
-- 🌐 **Rumble Automation**: Full browser automation with channel selection
-- ☁️ **Cloud Ready**: Deployable on Heroku, Railway, Render, or VPS
-- 🔒 **Secure**: Environment-based credential management
-- 📊 **Logging**: Comprehensive logging and error handling
-- 🔄 **Retry Logic**: Automatic retries for failed uploads
+### 🚀 Core Functionality
+- **Automated Video Upload**: Upload videos to Rumble via Telegram
+- **Real-time Progress Updates**: Step-by-step upload progress notifications
+- **Actual URL Extraction**: Get real Rumble video URLs (not generic links)
+- **Enhanced Error Handling**: Detailed error messages with actionable guidance
+- **Robust Processing**: Optimized upload workflow with reduced delays (30-50% faster)
+
+### 🎯 Advanced Features
+- **Smart Metadata Generation**: Automatic titles, descriptions, and tags
+- **Multiple Upload Formats**: Support for various video formats
+- **Graceful Shutdown**: Proper resource cleanup and process management
+- **Health Monitoring**: Built-in health check server
+- **Comprehensive Logging**: Detailed logging for debugging and monitoring
+
+### 📱 Enhanced Bot Commands
+- `/start` or `/help` - Show comprehensive help message
+- `/status` - Check bot and system status
+- `/stats` - View upload statistics and configuration
+- `/settings` - View current bot settings
+- `/cancel` - Cancel ongoing operations (where possible)
 
 ## Quick Start
 

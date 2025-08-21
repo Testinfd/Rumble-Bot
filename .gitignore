@@ -49,20 +49,64 @@ downloads/
 temp/
 uploads/
 
-# Selenium
+# Selenium & Browser Data
 chromedriver
 geckodriver
 *.exe
+selenium-debug.log
+browser_data/
+chrome_data/
+firefox_data/
+rumble_cookies.json
+cookies.json
+
+# Browser Downloads & Cache
+browser_downloads/
+browser_cache/
+browser_logs/
+
+# Video Processing
+processed/
+video_cache/
+thumbnails/
+metadata_cache/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
+test_results/
+test_videos/
 
 # Deployment
 .vercel
 .railway
+.docker/
+docker-compose.override.yml
+
+# Runtime Data
+*.pid
+*.lock
+runtime/
+sessions/
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*~
+
+# Development
+.vscode/settings.json
+.idea/workspace.xml
+*.sublime-*
+
+# Health Check & Monitoring
+health_check.log
+monitoring/
+metrics/

@@ -45,6 +45,10 @@ class Config:
     ENABLE_RANDOM_TITLES: bool = os.getenv("ENABLE_RANDOM_TITLES", "true").lower() == "true"
     ENABLE_RANDOM_DESCRIPTIONS: bool = os.getenv("ENABLE_RANDOM_DESCRIPTIONS", "true").lower() == "true"
     ENABLE_RANDOM_TAGS: bool = os.getenv("ENABLE_RANDOM_TAGS", "true").lower() == "true"
+
+    # Telegram Bot Features
+    ENABLE_PROGRESS_UPDATES: bool = os.getenv("ENABLE_PROGRESS_UPDATES", "true").lower() == "true"
+    ENABLE_DEBUG_INFO: bool = os.getenv("ENABLE_DEBUG_INFO", "true").lower() == "true"
     
     # Directories
     DOWNLOADS_DIR: str = "downloads"
