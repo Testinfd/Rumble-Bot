@@ -246,10 +246,34 @@ For help with configuration, contact your administrator.
     def _handle_video_message(self, message: Message):
         """Handle video file messages with detailed progress updates"""
         try:
+            # Check file size first
+            video = message.video or message.document
+            if video and hasattr(video, 'file_size'):
+                file_size_mb = video.file_size / (1024 * 1024)
+                max_size_mb = config.MAX_FILE_SIZE_MB
+
+                if file_size_mb > max_size_mb:
+                    error_msg = f"""
+📹 **Video Too Large**
+
+**File Size**: {file_size_mb:.1f} MB
+**Maximum Allowed**: {max_size_mb} MB
+
+**Please:**
+• Compress your video to under {max_size_mb} MB
+• Use a video compression tool
+• Try uploading a shorter clip
+
+**Tip**: Most video editors can export at lower quality/resolution to reduce file size.
+                    """
+                    self.bot.reply_to(message, error_msg, parse_mode='Markdown')
+                    log.warning(f"Video too large: {file_size_mb:.1f} MB from user {message.from_user.id}")
+                    return
+
             # Send initial response
             processing_msg = self.bot.reply_to(
                 message,
-                "📹 Video received! Processing and uploading to Rumble...\n\n⏳ This may take a few minutes."
+                f"📹 Video received! ({file_size_mb:.1f} MB)\n\n⏳ Processing and uploading to Rumble..."
             )
 
             # Extract metadata from message text
@@ -280,10 +304,46 @@ For help with configuration, contact your administrator.
             video_path = self._process_video_file(message)
 
             if not video_path:
+                # Check if it's a file size issue
+                video = message.video or message.document
+                if video and hasattr(video, 'file_size'):
+                    file_size_mb = video.file_size / (1024 * 1024)
+                    if file_size_mb > config.MAX_FILE_SIZE_MB:
+                        error_text = f"""
+❌ **Video Too Large**
+
+Your video ({file_size_mb:.1f} MB) exceeds the maximum size limit of {config.MAX_FILE_SIZE_MB} MB.
+
+**Solutions:**
+• Compress your video using a video editor
+• Upload a shorter clip
+• Reduce video quality/resolution
+• Try online video compressors
+
+**Tip**: Most phones can compress videos in their gallery apps.
+                        """
+                    else:
+                        error_text = """
+❌ **Download Failed**
+
+Unable to download your video. This could be due to:
+• Temporary network issues
+• File format not supported
+• Telegram API limitations
+
+**Please try:**
+• Uploading the video again
+• Converting to MP4 format
+• Checking your internet connection
+                        """
+                else:
+                    error_text = "❌ Failed to download video. Please try again with a different file."
+
                 self.bot.edit_message_text(
-                    "❌ Failed to download video. Please try again.",
+                    error_text,
                     message.chat.id,
-                    processing_msg.message_id
+                    processing_msg.message_id,
+                    parse_mode='Markdown'
                 )
                 return
 
@@ -491,7 +551,18 @@ Please try again later or contact support if the issue persists.
             return str(file_path)
             
         except Exception as e:
+            error_msg = str(e)
             log.error(f"Error downloading video: {e}")
+
+            # Provide specific error feedback
+            if "file is too big" in error_msg.lower():
+                log.warning(f"File size exceeded Telegram's limit for user {message.from_user.id}")
+                # This error is already handled in the main handler
+            elif "bad request" in error_msg.lower():
+                log.warning(f"Bad request error for user {message.from_user.id}: {error_msg}")
+            else:
+                log.error(f"Unexpected download error for user {message.from_user.id}: {error_msg}")
+
             return None
     
     def _cleanup_file(self, file_path: str):
