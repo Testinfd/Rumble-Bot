@@ -1,0 +1,17 @@
+# Minimal requirements for Render deployment - Enhanced Rumble Bot
+# Core bot functionality
+pyTelegramBotAPI==4.14.0
+selenium==4.15.2
+webdriver-manager==4.0.1
+faker==20.1.0
+python-dotenv==1.0.0
+
+# Essential utilities
+requests==2.31.0
+
+# Web server for health checks
+flask==3.0.0
+gunicorn==21.2.0
+
+# Logging
+loguru==0.7.2
