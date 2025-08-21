@@ -4,6 +4,8 @@ services:
     env: docker
     plan: starter
     dockerfilePath: ./Dockerfile
+    region: oregon
+    branch: main
     healthCheckPath: /health
     envVars:
       - key: TELEGRAM_BOT_TOKEN
