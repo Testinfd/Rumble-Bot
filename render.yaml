@@ -4,8 +4,11 @@ services:
     env: python
     plan: starter
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements-render.txt
+      apt-get update && apt-get install -y wget gnupg
+      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+      echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
+      apt-get update && apt-get install -y google-chrome-stable
+      pip install --upgrade pip && pip install -r requirements-render.txt
     startCommand: python main.py
     healthCheckPath: /health
     envVars:
