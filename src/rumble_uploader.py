@@ -14,7 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
-from webdriver_manager.chrome import ChromeDriverManager
+# from webdriver_manager.chrome import ChromeDriverManager  # Not needed with system ChromeDriver
 
 from .config import config
 from .logger import log
@@ -61,8 +61,8 @@ class RumbleUploader:
             }
             chrome_options.add_experimental_option("prefs", prefs)
             
-            # Setup ChromeDriver
-            service = Service(ChromeDriverManager().install())
+            # Setup ChromeDriver (use system-installed ChromeDriver)
+            service = Service("/usr/local/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=chrome_options)
             
             # Set timeouts
