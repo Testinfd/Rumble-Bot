@@ -23,7 +23,7 @@ RUN wget -q -O /tmp/google-chrome-key.pub https://dl-ssl.google.com/linux/linux_
 # Install ChromeDriver (use stable version that matches Chrome)
 RUN CHROME_VERSION=$(google-chrome --version | cut -d " " -f3) \
     && echo "Chrome version: $CHROME_VERSION" \
-    && CHROMEDRIVER_VERSION="131.0.6778.87" \
+    && CHROMEDRIVER_VERSION="139.0.7258.138" \
     && echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION" \
     && wget -q -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
     && unzip /tmp/chromedriver.zip -d /tmp/ \
