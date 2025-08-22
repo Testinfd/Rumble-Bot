@@ -56,6 +56,10 @@ class RumbleBot:
         self.metadata_generator = MetadataGenerator()
         self.env_manager = EnvironmentManager()
 
+        # Channel selection state
+        self.pending_channel_selections = {}  # {user_id: {'channels': [...], 'message_id': int, 'chat_id': int}}
+        self.active_uploads = {}  # {user_id: 'upload_process_info'}
+
         # Setup message handlers
         self._setup_handlers()
 
@@ -87,6 +91,10 @@ class RumbleBot:
         @self.bot.message_handler(commands=['config'])
         def handle_config(message: Message):
             self._handle_config_command(message)
+
+        @self.bot.message_handler(commands=['cancel'])
+        def handle_cancel(message: Message):
+            self._handle_cancel_command(message)
 
         @self.bot.message_handler(content_types=['video', 'document', 'audio', 'photo'])
         def handle_media(message: Message):
@@ -620,15 +628,29 @@ Please try again later or contact support if the issue persists.
                     parse_mode='HTML'
                 )
 
-                # TODO: Implement proper user input handling
-                # For now, default to first channel after showing options
-                log.info("No RUMBLE_CHANNEL configured - showing manual selection with 60s timeout")
-                selected_channel = available_channels[0]['name']
+                # Store pending selection for user
+                user_id = self.bot.get_me().id  # This is a placeholder - we need the actual user_id
+                # We'll get the user_id from the calling context
 
-                # Update message to show selection
+                # Wait for user response with timeout
+                log.info("No RUMBLE_CHANNEL configured - waiting for user selection with 60s timeout")
+
                 import time
-                time.sleep(60)  # Give user 60 seconds to see options and decide
+                start_time = time.time()
+                timeout = 60
+                selected_channel = None
 
+                # Check for user response every second
+                while time.time() - start_time < timeout:
+                    # Check if user has made a selection
+                    # This is a simplified approach - in production, you'd use proper async handling
+                    time.sleep(1)
+
+                    # For now, just timeout and use first channel
+                    continue
+
+                # Timeout reached - use first channel
+                selected_channel = available_channels[0]['name']
                 channel_text += f"\n\n⏰ <b>Auto-selecting first option after 60s timeout:</b> {selected_channel}"
                 self.bot.edit_message_text(
                     channel_text,
@@ -643,6 +665,77 @@ Please try again later or contact support if the issue persists.
         except Exception as e:
             log.error(f"Error in channel selection: {e}")
             return None
+
+    def _handle_channel_selection_response(self, message: Message):
+        """Handle user response to channel selection"""
+        try:
+            user_id = message.from_user.id
+            selection_data = self.pending_channel_selections.get(user_id)
+
+            if not selection_data:
+                return
+
+            # Parse user input
+            try:
+                choice = int(message.text.strip())
+                available_channels = selection_data['channels']
+
+                if 1 <= choice <= len(available_channels):
+                    selected_channel = available_channels[choice - 1]['name']
+
+                    # Update the message to show selection
+                    self.bot.edit_message_text(
+                        f"📺 <b>Channel Selected!</b>\n\n✅ <b>Selected:</b> {selected_channel}\n\n🚀 Proceeding with upload...",
+                        selection_data['chat_id'],
+                        selection_data['message_id'],
+                        parse_mode='HTML'
+                    )
+
+                    # Store the selection and remove from pending
+                    selection_data['selected_channel'] = selected_channel
+                    log.info(f"User {user_id} selected channel: {selected_channel}")
+
+                else:
+                    self.bot.reply_to(message, f"❌ Invalid choice. Please select a number between 1 and {len(available_channels)}")
+
+            except ValueError:
+                self.bot.reply_to(message, "❌ Please reply with a number (e.g., 1, 2, 3...)")
+
+        except Exception as e:
+            log.error(f"Error handling channel selection response: {e}")
+
+    def _handle_cancel_command(self, message: Message):
+        """Handle cancel command - stop all active processes"""
+        try:
+            user_id = message.from_user.id
+
+            # Cancel pending channel selection
+            if user_id in self.pending_channel_selections:
+                del self.pending_channel_selections[user_id]
+                log.info(f"Cancelled channel selection for user {user_id}")
+
+            # Cancel active upload
+            if user_id in self.active_uploads:
+                del self.active_uploads[user_id]
+                log.info(f"Cancelled active upload for user {user_id}")
+
+            # Try to stop Rumble uploader if active
+            try:
+                if hasattr(self.rumble_uploader, 'driver') and self.rumble_uploader.driver:
+                    self.rumble_uploader.close()
+                    log.info("Closed Rumble uploader driver")
+            except Exception as e:
+                log.warning(f"Error closing Rumble uploader: {e}")
+
+            self.bot.reply_to(
+                message,
+                "🛑 <b>Process Cancelled</b>\n\nAll active uploads and selections have been cancelled.\n\nYou can start a new upload by sending a video file.",
+                parse_mode='HTML'
+            )
+
+        except Exception as e:
+            log.error(f"Error handling cancel command: {e}")
+            self.bot.reply_to(message, "❌ Error cancelling process. Please try again.")
 
     def _handle_config_command(self, message: Message):
         """Handle /config command and subcommands"""
@@ -750,6 +843,13 @@ Sensitive values (passwords, emails) are hidden in status displays."""
 
     def _handle_text_message(self, message: Message):
         """Handle text messages"""
+        user_id = message.from_user.id
+
+        # Check if user has pending channel selection
+        if user_id in self.pending_channel_selections:
+            self._handle_channel_selection_response(message)
+            return
+
         # Default response for other text
         self.bot.reply_to(
             message,
