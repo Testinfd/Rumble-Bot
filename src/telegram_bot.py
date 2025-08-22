@@ -764,21 +764,31 @@ Sensitive values (passwords, emails) are hidden in status displays."""
 
                 except Exception as e:
                     log.warning(f"Pyrogram download failed: {e}")
+            else:
+                log.warning("Pyrogram client not available - API credentials not set")
 
             # Fallback to pyTelegramBotAPI if Pyrogram failed
             if not download_success:
                 try:
                     log.info("Falling back to pyTelegramBotAPI download")
-                    file_info = self.bot.get_file(file_id)
+
+                    # Try to get file info - this might fail for large files
+                    try:
+                        file_info = self.bot.get_file(file_id)
+                        download_url = f"https://api.telegram.org/file/bot{self.bot.token}/{file_info.file_path}"
+                        log.info(f"Got file URL: {download_url}")
+                    except Exception as e:
+                        log.error(f"Failed to get file info from Telegram: {e}")
+                        # For very large files, Telegram won't provide file_path
+                        # This is expected behavior - we need Pyrogram for these
+                        return None
 
                     # Download file directly using requests for better control
                     import requests
-                    download_url = f"https://api.telegram.org/file/bot{self.bot.token}/{file_info.file_path}"
-
                     log.info(f"Downloading from: {download_url}")
 
                     # Stream download to handle large files efficiently
-                    with requests.get(download_url, stream=True) as response:
+                    with requests.get(download_url, stream=True, timeout=300) as response:
                         response.raise_for_status()
 
                         with open(file_path, 'wb') as f:
@@ -797,7 +807,7 @@ Sensitive values (passwords, emails) are hidden in status displays."""
                     log.info("pyTelegramBotAPI download successful")
 
                 except Exception as e:
-                    log.error(f"Both download methods failed: {e}")
+                    log.error(f"pyTelegramBotAPI download failed: {e}")
                     return None
 
             if not download_success:
