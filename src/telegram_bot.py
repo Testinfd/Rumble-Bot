@@ -57,6 +57,10 @@ class RumbleBot:
         def handle_settings(message: Message):
             self._handle_settings_command(message)
 
+        @self.bot.message_handler(commands=['config'])
+        def handle_config(message: Message):
+            self._handle_config_command(message)
+
         @self.bot.message_handler(content_types=['video', 'document'])
         def handle_video(message: Message):
             self._handle_video_message(message)
@@ -434,10 +438,10 @@ Please try again later or contact support if the issue persists.
             log.error(f"Error processing video message: {e}")
             try:
                 self.bot.edit_message_text(
-                    f"❌ **System Error**\n\nAn unexpected error occurred: {str(e)}\n\nPlease try again later.",
+                    f"❌ <b>System Error</b>\n\nAn unexpected error occurred: {str(e)}\n\nPlease try again later.",
                     message.chat.id,
                     processing_msg.message_id,
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
             except:
                 self.bot.reply_to(message, f"❌ An error occurred: {str(e)}")
@@ -599,13 +603,6 @@ Sensitive values (passwords, emails) are hidden in status displays."""
 
     def _handle_text_message(self, message: Message):
         """Handle text messages"""
-        text = message.text.strip().lower()
-
-        # Check for configuration commands
-        if text.startswith('/config'):
-            self._handle_config_command(message)
-            return
-
         # Default response for other text
         self.bot.reply_to(
             message,
