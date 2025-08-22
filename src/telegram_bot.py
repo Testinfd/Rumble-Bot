@@ -4,6 +4,7 @@ Telegram Bot implementation for Rumble video uploads
 import os
 import re
 import time
+import asyncio
 from typing import Optional, Tuple, List
 import telebot
 from telebot.types import Message
@@ -17,6 +18,14 @@ from .metadata_generator import MetadataGenerator
 from .error_handler import error_handler
 from .env_manager import EnvironmentManager
 
+# Pyrogram for large file downloads
+try:
+    from pyrogram import Client as PyrogramClient
+    PYROGRAM_AVAILABLE = True
+except ImportError:
+    PYROGRAM_AVAILABLE = False
+    log.warning("Pyrogram not available - large file downloads may fail")
+
 
 class RumbleBot:
     """Main Telegram bot class for handling video uploads to Rumble"""
@@ -24,6 +33,24 @@ class RumbleBot:
     def __init__(self):
         """Initialize the bot with required components"""
         self.bot = telebot.TeleBot(config.TELEGRAM_BOT_TOKEN)
+
+        # Initialize Pyrogram client for large file downloads
+        self.pyrogram_client = None
+        if PYROGRAM_AVAILABLE and config.TELEGRAM_API_ID and config.TELEGRAM_API_HASH:
+            try:
+                self.pyrogram_client = PyrogramClient(
+                    "rumble_bot_downloader",
+                    api_id=int(config.TELEGRAM_API_ID),
+                    api_hash=config.TELEGRAM_API_HASH,
+                    bot_token=config.TELEGRAM_BOT_TOKEN
+                )
+                log.info("Pyrogram client initialized for large file downloads")
+            except Exception as e:
+                log.warning(f"Failed to initialize Pyrogram client: {e}")
+                self.pyrogram_client = None
+        else:
+            log.warning("Pyrogram client not available - set TELEGRAM_API_ID and TELEGRAM_API_HASH for large file support")
+
         self.video_processor = VideoProcessor()
         self.rumble_uploader = RumbleUploader()
         self.metadata_generator = MetadataGenerator()
@@ -329,7 +356,7 @@ For help with configuration, contact your administrator.
             )
 
             # Process the video
-            video_path = self._process_video_file(message, processing_msg)
+            video_path = asyncio.run(self._process_video_file(message, processing_msg))
 
             if not video_path:
                 # Check if it's a file size issue
@@ -658,7 +685,7 @@ Sensitive values (passwords, emails) are hidden in status displays."""
         
         return title, description, tags
     
-    def _process_video_file(self, message: Message, processing_msg=None) -> Optional[str]:
+    async def _process_video_file(self, message: Message, processing_msg=None) -> Optional[str]:
         """Download any media content from message - simplified approach"""
         try:
             # Check available disk space first
@@ -710,33 +737,72 @@ Sensitive values (passwords, emails) are hidden in status displays."""
 
             log.info(f"Downloading media: {file_name}")
 
-            # Use Telegram's direct download approach
-            file_info = self.bot.get_file(file_id)
-
             # Create file path
             file_path = Path(config.DOWNLOADS_DIR) / file_name
 
-            # Download file directly using requests for better control
-            import requests
-            download_url = f"https://api.telegram.org/file/bot{self.bot.token}/{file_info.file_path}"
+            # Try Pyrogram first for large file support, fallback to pyTelegramBotAPI
+            download_success = False
 
-            log.info(f"Downloading from: {download_url}")
+            if self.pyrogram_client:
+                try:
+                    log.info("Attempting download with Pyrogram (large file support)")
+                    # Start Pyrogram client if not already started
+                    if not self.pyrogram_client.is_connected:
+                        await self.pyrogram_client.start()
 
-            # Stream download to handle large files efficiently
-            with requests.get(download_url, stream=True) as response:
-                response.raise_for_status()
+                    # Download using Pyrogram (handles large files)
+                    downloaded_file = await self.pyrogram_client.download_media(
+                        file_id,
+                        file_name=str(file_path)
+                    )
 
-                with open(file_path, 'wb') as f:
-                    downloaded = 0
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                            downloaded += len(chunk)
+                    if downloaded_file and os.path.exists(file_path):
+                        log.info(f"Pyrogram download successful: {file_path}")
+                        download_success = True
+                    else:
+                        log.warning("Pyrogram download failed - file not created")
 
-                            # Log progress for large files
-                            if file_size > 0 and downloaded % (10 * 1024 * 1024) == 0:  # Every 10 MB
-                                progress = (downloaded / file_size) * 100
-                                log.info(f"Download progress: {downloaded / (1024*1024):.1f} MB ({progress:.1f}%)")
+                except Exception as e:
+                    log.warning(f"Pyrogram download failed: {e}")
+
+            # Fallback to pyTelegramBotAPI if Pyrogram failed
+            if not download_success:
+                try:
+                    log.info("Falling back to pyTelegramBotAPI download")
+                    file_info = self.bot.get_file(file_id)
+
+                    # Download file directly using requests for better control
+                    import requests
+                    download_url = f"https://api.telegram.org/file/bot{self.bot.token}/{file_info.file_path}"
+
+                    log.info(f"Downloading from: {download_url}")
+
+                    # Stream download to handle large files efficiently
+                    with requests.get(download_url, stream=True) as response:
+                        response.raise_for_status()
+
+                        with open(file_path, 'wb') as f:
+                            downloaded = 0
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
+                                    downloaded += len(chunk)
+
+                                    # Log progress for large files
+                                    if file_size > 0 and downloaded % (10 * 1024 * 1024) == 0:  # Every 10 MB
+                                        progress = (downloaded / file_size) * 100
+                                        log.info(f"Download progress: {downloaded / (1024*1024):.1f} MB ({progress:.1f}%)")
+
+                    download_success = True
+                    log.info("pyTelegramBotAPI download successful")
+
+                except Exception as e:
+                    log.error(f"Both download methods failed: {e}")
+                    return None
+
+            if not download_success:
+                log.error("All download methods failed")
+                return None
 
             log.info(f"Media downloaded successfully: {file_path}")
 

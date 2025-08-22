@@ -15,6 +15,10 @@ class Config:
     # Telegram Configuration
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_CHAT_ID: Optional[str] = os.getenv("TELEGRAM_CHAT_ID")
+
+    # Telegram API credentials for Pyrogram (for large file downloads)
+    TELEGRAM_API_ID: Optional[str] = os.getenv("TELEGRAM_API_ID")
+    TELEGRAM_API_HASH: Optional[str] = os.getenv("TELEGRAM_API_HASH")
     
     # Rumble Credentials
     RUMBLE_EMAIL: str = os.getenv("RUMBLE_EMAIL", "")
