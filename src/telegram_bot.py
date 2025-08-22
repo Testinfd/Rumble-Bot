@@ -273,20 +273,28 @@ For help with configuration, contact your administrator.
                 max_size_mb = config.MAX_FILE_SIZE_MB
 
                 if file_size_mb > max_size_mb:
-                    error_msg = f"""
-📹 **Video Too Large**
+                    error_msg = f"""❌ <b>File Too Large</b>
 
-**File Size**: {file_size_mb:.1f} MB
-**Maximum Allowed**: {max_size_mb} MB
+<b>File Size:</b> {file_size_mb:.1f} MB
+<b>Maximum Allowed:</b> {max_size_mb} MB
 
-**Please:**
-• Compress your video to under {max_size_mb} MB
+<b>💡 SOLUTION: Send as Document/File instead!</b>
+
+<b>How to send as document:</b>
+1. Tap 📎 attachment button
+2. Choose 📄 <b>File</b> (NOT 🎥 Video)
+3. Select your video file
+4. Send as document
+
+<b>Why this works:</b>
+• Video messages: ~50 MB limit
+• Document uploads: Up to 2 GB limit
+
+<b>Alternative options:</b>
+• Compress your video to under 50 MB
 • Use a video compression tool
-• Try uploading a shorter clip
-
-**Tip**: Most video editors can export at lower quality/resolution to reduce file size.
-                    """
-                    self.bot.reply_to(message, error_msg, parse_mode='Markdown')
+• Upload a shorter clip"""
+                    self.bot.reply_to(message, error_msg, parse_mode='HTML')
                     log.warning(f"Video too large: {file_size_mb:.1f} MB from user {message.from_user.id}")
                     return
 
@@ -321,7 +329,7 @@ For help with configuration, contact your administrator.
             )
 
             # Process the video
-            video_path = self._process_video_file(message)
+            video_path = self._process_video_file(message, processing_msg)
 
             if not video_path:
                 # Check if it's a file size issue
@@ -650,7 +658,7 @@ Sensitive values (passwords, emails) are hidden in status displays."""
         
         return title, description, tags
     
-    def _process_video_file(self, message: Message) -> Optional[str]:
+    def _process_video_file(self, message: Message, processing_msg=None) -> Optional[str]:
         """Download any media content from message - simplified approach"""
         try:
             # Check available disk space first
@@ -731,6 +739,40 @@ Sensitive values (passwords, emails) are hidden in status displays."""
                                 log.info(f"Download progress: {downloaded / (1024*1024):.1f} MB ({progress:.1f}%)")
 
             log.info(f"Media downloaded successfully: {file_path}")
+
+            # Convert video to ensure Rumble compatibility
+            if processing_msg:
+                try:
+                    self.bot.edit_message_text(
+                        f"📹 Media downloaded!\n\n🔄 Converting to Rumble-compatible format...",
+                        processing_msg.chat.id,
+                        processing_msg.message_id
+                    )
+                except Exception as e:
+                    log.warning(f"Failed to update progress message: {e}")
+
+            converted_path = self._convert_video_for_rumble(file_path)
+            if converted_path and converted_path != str(file_path):
+                # Remove original file if conversion was successful
+                try:
+                    os.remove(file_path)
+                    log.info(f"Removed original file after conversion: {file_path}")
+                except Exception as e:
+                    log.warning(f"Failed to remove original file: {e}")
+                return converted_path
+            elif converted_path is None:
+                # Conversion failed, but continue with original file
+                log.warning("Video conversion failed, proceeding with original file")
+                if processing_msg:
+                    try:
+                        self.bot.edit_message_text(
+                            f"📹 Media downloaded!\n\n⚠️ Conversion failed, using original format...",
+                            processing_msg.chat.id,
+                            processing_msg.message_id
+                        )
+                    except Exception as e:
+                        log.warning(f"Failed to update progress message: {e}")
+
             return str(file_path)
             
         except Exception as e:
@@ -756,7 +798,74 @@ Sensitive values (passwords, emails) are hidden in status displays."""
                 log.warning(f"Failed to clean up partial file: {cleanup_error}")
 
             return None
-    
+
+    def _convert_video_for_rumble(self, input_path: str) -> Optional[str]:
+        """Convert video to Rumble-compatible format using FFmpeg"""
+        try:
+            import subprocess
+
+            # Check if input file exists
+            if not os.path.exists(input_path):
+                log.error(f"Input file does not exist: {input_path}")
+                return None
+
+            # Get file info
+            input_file = Path(input_path)
+            file_size_mb = input_file.stat().st_size / (1024 * 1024)
+
+            log.info(f"Converting video for Rumble compatibility: {input_file.name} ({file_size_mb:.1f} MB)")
+
+            # Create output path with .mp4 extension
+            output_path = input_file.parent / f"{input_file.stem}_converted.mp4"
+
+            # FFmpeg command for Rumble-compatible video
+            # Using H.264 codec with AAC audio, which is widely supported
+            ffmpeg_cmd = [
+                'ffmpeg',
+                '-i', str(input_path),
+                '-c:v', 'libx264',           # H.264 video codec
+                '-preset', 'medium',         # Encoding speed vs compression
+                '-crf', '23',                # Quality (18-28, lower = better quality)
+                '-c:a', 'aac',               # AAC audio codec
+                '-b:a', '128k',              # Audio bitrate
+                '-movflags', '+faststart',   # Optimize for web streaming
+                '-pix_fmt', 'yuv420p',       # Pixel format for compatibility
+                '-y',                        # Overwrite output file
+                str(output_path)
+            ]
+
+            log.info(f"Running FFmpeg conversion: {' '.join(ffmpeg_cmd)}")
+
+            # Run FFmpeg with timeout
+            process = subprocess.run(
+                ffmpeg_cmd,
+                capture_output=True,
+                text=True,
+                timeout=1800  # 30 minute timeout
+            )
+
+            if process.returncode == 0:
+                if os.path.exists(output_path):
+                    output_size_mb = output_path.stat().st_size / (1024 * 1024)
+                    log.info(f"Video conversion successful: {output_path.name} ({output_size_mb:.1f} MB)")
+                    return str(output_path)
+                else:
+                    log.error("FFmpeg reported success but output file not found")
+                    return None
+            else:
+                log.error(f"FFmpeg conversion failed: {process.stderr}")
+                return None
+
+        except subprocess.TimeoutExpired:
+            log.error("Video conversion timed out (30 minutes)")
+            return None
+        except FileNotFoundError:
+            log.error("FFmpeg not found. Please install FFmpeg for video conversion.")
+            return None
+        except Exception as e:
+            log.error(f"Error during video conversion: {e}")
+            return None
+
     def _cleanup_file(self, file_path: str):
         """Clean up downloaded file"""
         try:
