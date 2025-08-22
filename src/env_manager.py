@@ -7,14 +7,13 @@ import os
 import re
 from typing import Dict, Optional, Tuple, List
 from .logger import log
-from .security import SecurityManager
+from .security import credential_manager
 
 
 class EnvironmentManager:
     """Manages environment variables securely through Telegram interface"""
     
     def __init__(self):
-        self.security = SecurityManager()
         self.env_file_path = ".env"
         
         # Define configurable environment variables

@@ -15,7 +15,7 @@ from .video_processor import VideoProcessor
 from .rumble_uploader import RumbleUploader
 from .metadata_generator import MetadataGenerator
 from .error_handler import error_handler
-from .env_manager import EnvironmentManager, RetryableError, NonRetryableError, format_error_message
+from .env_manager import EnvironmentManager
 
 
 class RumbleBot:
