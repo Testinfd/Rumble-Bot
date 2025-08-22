@@ -610,6 +610,7 @@ Please try again later or contact support if the issue persists.
             else:
                 # Manual selection - show options and wait for user input
                 channel_text += f"\n💬 <b>Reply with the number (1-{len(available_channels)}) to select your channel:</b>"
+                channel_text += f"\n⏰ <i>Auto-selecting first option in 60 seconds if no response...</i>"
 
                 # Send channel selection message
                 self.bot.edit_message_text(
@@ -621,14 +622,14 @@ Please try again later or contact support if the issue persists.
 
                 # TODO: Implement proper user input handling
                 # For now, default to first channel after showing options
-                log.info("No RUMBLE_CHANNEL configured - showing manual selection (TODO: implement user input)")
+                log.info("No RUMBLE_CHANNEL configured - showing manual selection with 60s timeout")
                 selected_channel = available_channels[0]['name']
 
                 # Update message to show selection
                 import time
-                time.sleep(5)  # Give user time to see options
+                time.sleep(60)  # Give user 60 seconds to see options and decide
 
-                channel_text += f"\n\n⏰ <b>Auto-selecting first option due to timeout:</b> {selected_channel}"
+                channel_text += f"\n\n⏰ <b>Auto-selecting first option after 60s timeout:</b> {selected_channel}"
                 self.bot.edit_message_text(
                     channel_text,
                     chat_id,
