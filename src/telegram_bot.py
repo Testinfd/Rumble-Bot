@@ -496,6 +496,14 @@ Please try again later or contact support if the issue persists.
     def _handle_config_command(self, message: Message):
         """Handle /config command and subcommands"""
         try:
+            # Debug log to check message type
+            log.debug(f"Config command message type: {type(message)}")
+
+            # Validate message object
+            if not hasattr(message, 'text') or not hasattr(message, 'chat'):
+                log.error(f"Invalid message object: {type(message)}")
+                return
+
             # Parse command arguments - handle extra spaces
             text = message.text.strip()
             parts = [part for part in text.split() if part]  # Remove empty parts
@@ -571,12 +579,23 @@ Sensitive values (passwords, emails) are hidden in status displays."""
             else:
                 response = "❌ Invalid command format.\nUse `/config help` for usage instructions."
 
-            self.bot.reply_to(message, response, parse_mode='HTML')
-            log.info(f"Handled config command from user {message.from_user.id}")
+            # Ensure message is valid before replying
+            if hasattr(message, 'chat') and hasattr(message, 'from_user'):
+                self.bot.reply_to(message, response, parse_mode='HTML')
+                log.info(f"Handled config command from user {message.from_user.id}")
+            else:
+                log.error(f"Invalid message object in config handler: {type(message)}")
 
         except Exception as e:
             log.error(f"Error handling config command: {e}")
-            self.bot.reply_to(message, "❌ Error processing configuration command. Please try again.")
+            try:
+                # Ensure message is a proper Message object
+                if hasattr(message, 'chat') and hasattr(message, 'message_id'):
+                    self.bot.reply_to(message, "❌ Error processing configuration command. Please try again.")
+                else:
+                    log.error(f"Invalid message object type: {type(message)}")
+            except Exception as reply_error:
+                log.error(f"Failed to send error reply: {reply_error}")
 
     def _handle_text_message(self, message: Message):
         """Handle text messages"""
