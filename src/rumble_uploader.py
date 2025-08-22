@@ -676,12 +676,32 @@ class RumbleUploader:
 
             log.info(f"Selecting upload destination: {destination}")
 
+            # First, let's see what channels are available
+            try:
+                all_labels = self.driver.find_elements(By.XPATH, "//label[contains(@for, 'channelId')]")
+                available_channels = [label.text.strip() for label in all_labels if label.text.strip()]
+                log.info(f"Available channels: {available_channels}")
+            except Exception as e:
+                log.debug(f"Could not list available channels: {e}")
+
             # Method 1: Find by label text and get associated radio (PROVEN METHOD)
             try:
-                label = self.driver.find_element(By.XPATH, f"//label[contains(text(), '{destination}')]")
+                # Try exact match first
+                label = self.driver.find_element(By.XPATH, f"//label[text()='{destination}']")
                 for_attr = label.get_attribute('for')
+                log.info(f"Found exact match for '{destination}'")
+            except:
+                try:
+                    # Try partial match
+                    label = self.driver.find_element(By.XPATH, f"//label[contains(text(), '{destination}')]")
+                    for_attr = label.get_attribute('for')
+                    log.info(f"Found partial match for '{destination}'")
+                except Exception as e:
+                    log.warning(f"Could not find channel '{destination}': {e}")
+                    for_attr = None
 
-                if for_attr:
+            if for_attr:
+                try:
                     radio = self.driver.find_element(By.XPATH, f"//input[@id='{for_attr}']")
 
                     log.info(f"Found radio for '{destination}' with id='{for_attr}'")
@@ -702,8 +722,8 @@ class RumbleUploader:
                     else:
                         log.warning(f"❌ Channel '{destination}' selection verification failed")
 
-            except Exception as e:
-                log.debug(f"Label method failed: {e}")
+                except Exception as e:
+                    log.warning(f"Failed to select radio for '{destination}': {e}")
 
             # Method 2: Fallback - try all channel radios and select first available
             try:
