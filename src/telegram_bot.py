@@ -577,34 +577,65 @@ Please try again later or contact support if the issue persists.
             # For now, let's show the options and auto-select "Ruslan Belov" if available
             log.info(f"Available channels: {[ch['name'] for ch in available_channels]}")
 
-            # Look for "Ruslan Belov" channel
-            ruslan_channel = None
-            for channel in available_channels:
-                if "Ruslan Belov" in channel['name']:
-                    ruslan_channel = channel['name']
-                    break
+            # Check if RUMBLE_CHANNEL is set in environment for auto-selection
+            env_channel = config.RUMBLE_CHANNEL if hasattr(config, 'RUMBLE_CHANNEL') and config.RUMBLE_CHANNEL else None
 
-            if ruslan_channel:
-                selected_channel = ruslan_channel
-                channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel}"
-                log.info(f"Found and selected 'Ruslan Belov' channel: {selected_channel}")
+            if env_channel:
+                # Auto-select based on environment variable
+                selected_channel = None
+                for channel in available_channels:
+                    if env_channel.lower() in channel['name'].lower():
+                        selected_channel = channel['name']
+                        break
+
+                if selected_channel:
+                    channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel} (from config)"
+                    log.info(f"Auto-selected channel from config: {selected_channel}")
+                else:
+                    selected_channel = available_channels[0]['name']
+                    channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel} (config channel not found, using default)"
+                    log.warning(f"Configured channel '{env_channel}' not found, using first available: {selected_channel}")
+
+                # Send channel selection message
+                self.bot.edit_message_text(
+                    channel_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='HTML'
+                )
+
+                # Give user a moment to see the selection
+                import time
+                time.sleep(3)
             else:
-                # Default to first channel
+                # Manual selection - show options and wait for user input
+                channel_text += f"\n💬 <b>Reply with the number (1-{len(available_channels)}) to select your channel:</b>"
+
+                # Send channel selection message
+                self.bot.edit_message_text(
+                    channel_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='HTML'
+                )
+
+                # TODO: Implement proper user input handling
+                # For now, default to first channel after showing options
+                log.info("No RUMBLE_CHANNEL configured - showing manual selection (TODO: implement user input)")
                 selected_channel = available_channels[0]['name']
-                channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel} (default)"
-                log.info(f"'Ruslan Belov' not found, using first channel: {selected_channel}")
 
-            # Send channel selection message
-            self.bot.edit_message_text(
-                channel_text,
-                chat_id,
-                message_id,
-                parse_mode='HTML'
-            )
+                # Update message to show selection
+                import time
+                time.sleep(5)  # Give user time to see options
 
-            # Give user a moment to see the selection
-            import time
-            time.sleep(3)
+                channel_text += f"\n\n⏰ <b>Auto-selecting first option due to timeout:</b> {selected_channel}"
+                self.bot.edit_message_text(
+                    channel_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='HTML'
+                )
+                time.sleep(2)
 
             return selected_channel
 

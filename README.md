@@ -1,29 +1,60 @@
-# 🤖 Enhanced Rumble Bot - Automated Video Upload Assistant
+# 🤖 Enhanced Rumble Bot - Large File Video Upload Assistant
 
-An advanced Telegram bot that automatically uploads videos to Rumble with real-time progress updates, enhanced error handling, and actual video URL extraction.
+An advanced Telegram bot that automatically uploads videos to Rumble with **large file support (up to 2GB)**, dynamic channel selection, intelligent metadata generation, and real-time progress tracking.
 
-## ✨ Enhanced Features
+## ✨ Latest Features
 
-### 🚀 Core Functionality
+### 📤 **Large File Support (NEW!)**
+- **2GB File Uploads**: Handle large videos using Pyrogram integration
+- **Hybrid Download System**: Pyrogram for large files + pyTelegramBotAPI fallback
+- **Universal Media Support**: Video, document, audio, and photo uploads
+- **Smart File Handling**: Automatic format detection and processing
+
+### 🎯 **Dynamic Channel Management (NEW!)**
+- **Auto Channel Discovery**: Automatically detects your available Rumble channels
+- **Smart Selection Logic**: Auto-select from `RUMBLE_CHANNEL` env var or manual choice
+- **Interactive Selection**: Shows numbered channel options when no env channel set
+- **Multi-Account Support**: Works with any Rumble account's channels
+
+### 🚀 **Core Functionality**
 - **Automated Video Upload**: Upload videos to Rumble via Telegram
 - **Real-time Progress Updates**: Step-by-step upload progress notifications
 - **Actual URL Extraction**: Get real Rumble video URLs (not generic links)
 - **Enhanced Error Handling**: Detailed error messages with actionable guidance
 - **Robust Processing**: Optimized upload workflow with reduced delays (30-50% faster)
 
-### 🎯 Advanced Features
-- **Smart Metadata Generation**: Automatic titles, descriptions, and tags
-- **Multiple Upload Formats**: Support for various video formats
-- **Graceful Shutdown**: Proper resource cleanup and process management
+### 🎯 **Advanced Features**
+- **Smart Metadata Generation**: AI-powered titles, descriptions, and tags
+- **Optional Video Conversion**: FFmpeg integration for format compatibility
+- **Configuration Management**: Bot-based environment variable management
 - **Health Monitoring**: Built-in health check server
 - **Comprehensive Logging**: Detailed logging for debugging and monitoring
 
-### 📱 Enhanced Bot Commands
-- `/start` or `/help` - Show comprehensive help message
-- `/status` - Check bot and system status
-- `/stats` - View upload statistics and configuration
-- `/settings` - View current bot settings
-- `/cancel` - Cancel ongoing operations (where possible)
+### 📱 **Bot Commands**
+- `/start` or `/help` - Show comprehensive help message with upload tips
+- `/config` - **NEW!** Manage environment variables and bot configuration
+- `/config status` - View current configuration and environment variables
+- `/config set KEY "value"` - Set environment variables (e.g., RUMBLE_CHANNEL)
+- `/config list` - List all configurable environment variables
+- `/settings` - View current bot settings and feature toggles
+
+## 📹 **How to Upload Large Videos**
+
+### **For Large Files (>50 MB):**
+1. In Telegram, tap the **📎 attachment** button
+2. Choose **📄 File** (NOT 🎥 Video)
+3. Select your video file
+4. Send as document
+
+### **Channel Selection:**
+- **With RUMBLE_CHANNEL set**: Bot auto-selects your configured channel
+- **Without RUMBLE_CHANNEL**: Bot shows available channels and waits for your choice
+- **Dynamic Discovery**: Bot automatically finds your available Rumble channels
+
+### **Supported Formats:**
+- **Video**: MP4, AVI, MOV, MKV, and more
+- **Size Limits**: Up to 2GB when sent as documents
+- **Auto-Conversion**: Optional FFmpeg conversion for compatibility
 
 ## Quick Start
 
@@ -33,6 +64,7 @@ An advanced Telegram bot that automatically uploads videos to Rumble with real-t
 - Chrome/Chromium browser
 - Telegram Bot Token
 - Rumble account
+- **Telegram API Credentials** (for large file support)
 
 ### Installation
 
@@ -66,13 +98,41 @@ An advanced Telegram bot that automatically uploads videos to Rumble with real-t
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 
+# Telegram API Credentials (for large file support)
+TELEGRAM_API_ID=your_api_id_from_my.telegram.org
+TELEGRAM_API_HASH=your_api_hash_from_my.telegram.org
+
 # Rumble Account Credentials
 RUMBLE_EMAIL=your_rumble_email@example.com
 RUMBLE_PASSWORD=your_rumble_password_here
-RUMBLE_CHANNEL=your_channel_name_here
 ```
 
-### Optional Configuration
+### Optional Environment Variables
+
+```env
+# Channel Selection (optional - if not set, bot will show channel options)
+RUMBLE_CHANNEL=your_preferred_channel_name
+
+# Large File & Conversion Settings
+MAX_FILE_SIZE_MB=2048
+ENABLE_VIDEO_CONVERSION=false
+```
+
+### 🔑 **Getting Telegram API Credentials**
+
+For large file support (up to 2GB), you need Telegram API credentials:
+
+1. Go to https://my.telegram.org/auth
+2. Log in with your phone number
+3. Go to "API Development Tools"
+4. Create an app:
+   - **App title**: "Rumble Bot"
+   - **Short name**: "rumblebot"
+   - **Description**: "Video upload bot"
+5. Copy your `api_id` (number) and `api_hash` (string)
+6. Add them to your environment variables
+
+### Additional Configuration
 
 ```env
 # Bot Settings
