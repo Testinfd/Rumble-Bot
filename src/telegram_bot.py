@@ -14,7 +14,8 @@ from .logger import log
 from .video_processor import VideoProcessor
 from .rumble_uploader import RumbleUploader
 from .metadata_generator import MetadataGenerator
-from .error_handler import error_handler, RetryableError, NonRetryableError, format_error_message
+from .error_handler import error_handler
+from .env_manager import EnvironmentManager, RetryableError, NonRetryableError, format_error_message
 
 
 class RumbleBot:
@@ -26,10 +27,11 @@ class RumbleBot:
         self.video_processor = VideoProcessor()
         self.rumble_uploader = RumbleUploader()
         self.metadata_generator = MetadataGenerator()
-        
+        self.env_manager = EnvironmentManager()
+
         # Setup message handlers
         self._setup_handlers()
-        
+
         log.info("RumbleBot initialized successfully")
     
     def _setup_handlers(self):
@@ -92,6 +94,14 @@ It can be multiple lines.
 • `/stats` - View upload statistics
 • `/settings` - View current configuration
 • `/cancel` - Cancel ongoing operations
+• `/config` - Configure environment settings
+
+**🔧 Configuration Commands:**
+• `/config status` - View current configuration
+• `/config setup` - Get setup instructions
+• `/config list` - List all configurable variables
+• `/config set VAR value` - Set environment variable
+• `/config help` - Configuration help
 
 **✨ Enhanced Features:**
 • Real-time progress updates during upload
@@ -483,8 +493,104 @@ Please try again later or contact support if the issue persists.
             debug_info = f'Progress update error: {e}' if config.ENABLE_DEBUG_INFO else ''
             return {'success': False, 'error': str(e), 'debug_info': debug_info}
     
+    def _handle_config_command(self, message: Message):
+        """Handle /config command and subcommands"""
+        try:
+            # Parse command arguments
+            text = message.text.strip()
+            parts = text.split()
+
+            if len(parts) == 1:  # Just "/config"
+                response = self.env_manager.get_setup_instructions()
+
+            elif len(parts) == 2:  # "/config subcommand"
+                subcommand = parts[1].lower()
+
+                if subcommand == 'status':
+                    status = self.env_manager.get_configuration_status()
+                    response = f"""
+🔧 **Environment Configuration Status**
+
+**Configured Variables:** {status['configured_count']}/{status['total_vars']}
+
+"""
+                    if status['configured']:
+                        response += "**✅ Configured:**\n"
+                        for var_name, var_info in status['configured'].items():
+                            response += f"• **{var_name}**: {var_info['value']}\n"
+
+                    if status['missing']:
+                        response += "\n**❌ Missing Required:**\n"
+                        for var in status['missing']:
+                            response += f"• **{var['name']}**: {var['description']}\n"
+
+                    if not status['missing']:
+                        response += "\n✅ **All required variables configured!**"
+
+                elif subcommand == 'setup':
+                    response = self.env_manager.get_setup_instructions()
+
+                elif subcommand == 'list':
+                    response = self.env_manager.get_variable_list()
+
+                elif subcommand == 'help':
+                    response = """
+🔧 **Configuration Help**
+
+**Available Commands:**
+• `/config status` - View current configuration
+• `/config setup` - Get setup instructions
+• `/config list` - List all configurable variables
+• `/config set VAR value` - Set environment variable
+• `/config help` - Show this help
+
+**Setting Variables:**
+Use `/config set VARIABLE_NAME value` format.
+
+**Examples:**
+• `/config set RUMBLE_EMAIL your@email.com`
+• `/config set RUMBLE_PASSWORD yourpassword`
+• `/config set RUMBLE_CHANNEL "Your Channel"`
+• `/config set MAX_FILE_SIZE_MB 1024`
+• `/config set HEADLESS_MODE true`
+
+**⚠️ Security:**
+Sensitive values (passwords, emails) are hidden in status displays.
+                    """
+
+                else:
+                    response = f"❌ Unknown subcommand: {subcommand}\nUse `/config help` for available commands."
+
+            elif len(parts) >= 4 and parts[1].lower() == 'set':  # "/config set VAR value"
+                var_name = parts[2].upper()
+                value = ' '.join(parts[3:])  # Join remaining parts as value
+
+                success, message = self.env_manager.set_environment_variable(var_name, value)
+                response = message
+
+                if success:
+                    response += "\n\n💡 **Note:** Changes take effect immediately for new operations."
+
+            else:
+                response = "❌ Invalid command format.\nUse `/config help` for usage instructions."
+
+            self.bot.reply_to(message, response, parse_mode='Markdown')
+            log.info(f"Handled config command from user {message.from_user.id}")
+
+        except Exception as e:
+            log.error(f"Error handling config command: {e}")
+            self.bot.reply_to(message, "❌ Error processing configuration command. Please try again.")
+
     def _handle_text_message(self, message: Message):
         """Handle text messages"""
+        text = message.text.strip().lower()
+
+        # Check for configuration commands
+        if text.startswith('/config'):
+            self._handle_config_command(message)
+            return
+
+        # Default response for other text
         self.bot.reply_to(
             message,
             "📹 Please send a video file to upload to Rumble.\n\nUse /help for more information."
