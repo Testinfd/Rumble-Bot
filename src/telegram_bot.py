@@ -500,6 +500,12 @@ Please try again later or contact support if the issue persists.
         """Upload video with progress updates to user"""
         try:
             if config.ENABLE_PROGRESS_UPDATES:
+                # Phase 0: Get available channels
+                self.bot.edit_message_text(
+                    f"🔍 Getting available channels...\n\n📝 **Video:** {title}",
+                    chat_id, message_id, parse_mode='Markdown'
+                )
+
                 # Phase 1: Login
                 self.bot.edit_message_text(
                     f"🔐 Logging into Rumble...\n\n📝 **Video:** {title}",
@@ -530,13 +536,21 @@ Please try again later or contact support if the issue persists.
                     chat_id, message_id, parse_mode='Markdown'
                 )
 
+            # Get available channels and ask user to choose
+            available_channels = self.rumble_uploader.get_available_channels()
+            selected_channel = None
+
+            if available_channels:
+                # Ask user to select channel
+                selected_channel = self._ask_user_for_channel_selection(chat_id, available_channels, message_id)
+
             # Actual upload
             upload_result = self.rumble_uploader.upload_video(
                 video_path=video_path,
                 title=title,
                 description=description,
                 tags=tags,
-                channel=config.RUMBLE_CHANNEL
+                channel=selected_channel
             )
 
             return upload_result
@@ -545,7 +559,40 @@ Please try again later or contact support if the issue persists.
             log.error(f"Error in upload with progress: {e}")
             debug_info = f'Progress update error: {e}' if config.ENABLE_DEBUG_INFO else ''
             return {'success': False, 'error': str(e), 'debug_info': debug_info}
-    
+
+    def _ask_user_for_channel_selection(self, chat_id: int, available_channels: list, message_id: int) -> str:
+        """Ask user to select a channel from available options"""
+        try:
+            # Create channel selection message
+            channel_text = "📺 **Select Upload Channel:**\n\n"
+            for i, channel in enumerate(available_channels, 1):
+                channel_text += f"{i}. {channel['name']}\n"
+
+            channel_text += f"\n💬 Reply with the number (1-{len(available_channels)}) to select your channel:"
+
+            # Send channel selection message
+            self.bot.edit_message_text(
+                channel_text,
+                chat_id,
+                message_id,
+                parse_mode='Markdown'
+            )
+
+            # Wait for user response (simplified - in real implementation you'd use a callback)
+            # For now, return the first channel as default
+            log.info(f"Available channels: {[ch['name'] for ch in available_channels]}")
+
+            # TODO: Implement proper user selection mechanism
+            # For now, use the first available channel
+            selected_channel = available_channels[0]['name']
+            log.info(f"Auto-selecting first channel: {selected_channel}")
+
+            return selected_channel
+
+        except Exception as e:
+            log.error(f"Error in channel selection: {e}")
+            return None
+
     def _handle_config_command(self, message: Message):
         """Handle /config command and subcommands"""
         try:

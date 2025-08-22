@@ -668,6 +668,34 @@ class RumbleUploader:
             log.error(f"Error selecting category: {e}")
             return False
 
+    def get_available_channels(self) -> list:
+        """Get list of available channels for user selection"""
+        try:
+            # Navigate to upload page to see channels
+            self.driver.get("https://rumble.com/upload.php")
+            self._human_delay(2, 3)
+
+            # Find all channel labels
+            all_labels = self.driver.find_elements(By.XPATH, "//label[contains(@for, 'channelId')]")
+            available_channels = []
+
+            for label in all_labels:
+                channel_text = label.text.strip()
+                if channel_text:
+                    # Get the associated radio button ID
+                    for_attr = label.get_attribute('for')
+                    available_channels.append({
+                        'name': channel_text,
+                        'id': for_attr
+                    })
+
+            log.info(f"Found {len(available_channels)} available channels")
+            return available_channels
+
+        except Exception as e:
+            log.error(f"Error getting available channels: {e}")
+            return []
+
     def _select_upload_destination(self, destination: str = None) -> bool:
         """Select upload destination/channel using the proven method"""
         try:
