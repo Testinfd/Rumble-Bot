@@ -366,14 +366,12 @@ Your video is too large for Telegram to process (over 50 MB limit).
 • Reduce video quality/resolution
 
 <b>💡 Best Solution:</b> Use the document/file option in Telegram for large videos!"""
-                else:
-                    error_text = "❌ Failed to download video. Please try again with a different file."
 
                 self.bot.edit_message_text(
                     error_text,
                     message.chat.id,
                     processing_msg.message_id,
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
                 return
 
