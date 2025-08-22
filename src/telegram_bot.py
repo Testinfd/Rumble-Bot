@@ -7,7 +7,7 @@ import time
 import asyncio
 from typing import Optional, Tuple, List
 import telebot
-from telebot.types import Message
+from telebot.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pathlib import Path
 
 from .config import config
@@ -99,6 +99,10 @@ class RumbleBot:
         @self.bot.message_handler(content_types=['video', 'document', 'audio', 'photo'])
         def handle_media(message: Message):
             self._handle_video_message(message)
+
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('channel_'))
+        def handle_channel_selection(call: CallbackQuery):
+            self._handle_channel_callback(call)
 
         @self.bot.message_handler(func=lambda message: True and not (hasattr(message, 'text') and message.text and message.text.startswith('/config')))
         def handle_text(message: Message):
@@ -577,18 +581,13 @@ Please try again later or contact support if the issue persists.
     def _ask_user_for_channel_selection(self, chat_id: int, available_channels: list, message_id: int) -> str:
         """Ask user to select a channel from available options"""
         try:
-            # Create channel selection message
-            channel_text = "📺 <b>Select Upload Channel:</b>\n\n"
-            for i, channel in enumerate(available_channels, 1):
-                channel_text += f"{i}. {channel['name']}\n"
-
-            # For now, let's show the options and auto-select "Ruslan Belov" if available
             log.info(f"Available channels: {[ch['name'] for ch in available_channels]}")
 
             # Check if RUMBLE_CHANNEL is set in environment for auto-selection
-            env_channel = config.RUMBLE_CHANNEL if hasattr(config, 'RUMBLE_CHANNEL') and config.RUMBLE_CHANNEL else None
+            env_channel = getattr(config, 'RUMBLE_CHANNEL', None)
+            log.info(f"Environment RUMBLE_CHANNEL: '{env_channel}'")
 
-            if env_channel:
+            if env_channel and env_channel.strip():
                 # Auto-select based on environment variable
                 selected_channel = None
                 for channel in available_channels:
@@ -597,14 +596,14 @@ Please try again later or contact support if the issue persists.
                         break
 
                 if selected_channel:
-                    channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel} (from config)"
+                    channel_text = f"📺 <b>Channel Auto-Selected from Config:</b>\n\n✅ <b>{selected_channel}</b>\n\n🚀 Proceeding with upload..."
                     log.info(f"Auto-selected channel from config: {selected_channel}")
                 else:
                     selected_channel = available_channels[0]['name']
-                    channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel} (config channel not found, using default)"
+                    channel_text = f"📺 <b>Config Channel Not Found:</b>\n\n⚠️ Configured: '{env_channel}'\n✅ Using: {selected_channel} (first available)\n\n🚀 Proceeding with upload..."
                     log.warning(f"Configured channel '{env_channel}' not found, using first available: {selected_channel}")
 
-                # Send channel selection message
+                # Send auto-selection message
                 self.bot.edit_message_text(
                     channel_text,
                     chat_id,
@@ -615,50 +614,72 @@ Please try again later or contact support if the issue persists.
                 # Give user a moment to see the selection
                 import time
                 time.sleep(3)
+                return selected_channel
             else:
-                # Manual selection - show options and wait for user input
-                channel_text += f"\n💬 <b>Reply with the number (1-{len(available_channels)}) to select your channel:</b>"
-                channel_text += f"\n⏰ <i>Auto-selecting first option in 60 seconds if no response...</i>"
+                # Manual selection with clickable buttons
+                channel_text = "📺 <b>Select Upload Channel:</b>\n\n"
 
-                # Send channel selection message
+                # Create inline keyboard with channel buttons
+                keyboard = InlineKeyboardMarkup()
+                for i, channel in enumerate(available_channels):
+                    button = InlineKeyboardButton(
+                        text=f"{i+1}. {channel['name']}",
+                        callback_data=f"channel_{i}"
+                    )
+                    keyboard.add(button)
+
+                # Add cancel button
+                cancel_button = InlineKeyboardButton("❌ Cancel", callback_data="channel_cancel")
+                keyboard.add(cancel_button)
+
+                channel_text += "👆 <b>Click a button to select your channel:</b>"
+
+                # Send channel selection message with buttons
                 self.bot.edit_message_text(
                     channel_text,
                     chat_id,
                     message_id,
-                    parse_mode='HTML'
+                    parse_mode='HTML',
+                    reply_markup=keyboard
                 )
 
-                # Store pending selection for user
-                user_id = self.bot.get_me().id  # This is a placeholder - we need the actual user_id
-                # We'll get the user_id from the calling context
+                log.info("No RUMBLE_CHANNEL configured - showing manual selection with buttons")
 
-                # Wait for user response with timeout
-                log.info("No RUMBLE_CHANNEL configured - waiting for user selection with 60s timeout")
+                # Store the channels for callback handling
+                self.pending_channel_selections[chat_id] = {
+                    'channels': available_channels,
+                    'message_id': message_id,
+                    'chat_id': chat_id,
+                    'selected_channel': None
+                }
 
+                # Wait for user selection (this will be handled by callback)
                 import time
-                start_time = time.time()
                 timeout = 60
-                selected_channel = None
+                start_time = time.time()
 
-                # Check for user response every second
                 while time.time() - start_time < timeout:
-                    # Check if user has made a selection
-                    # This is a simplified approach - in production, you'd use proper async handling
+                    selection_data = self.pending_channel_selections.get(chat_id)
+                    if selection_data and selection_data.get('selected_channel'):
+                        selected_channel = selection_data['selected_channel']
+                        del self.pending_channel_selections[chat_id]
+                        return selected_channel
                     time.sleep(1)
 
-                    # For now, just timeout and use first channel
-                    continue
-
-                # Timeout reached - use first channel
+                # Timeout - use first channel
                 selected_channel = available_channels[0]['name']
-                channel_text += f"\n\n⏰ <b>Auto-selecting first option after 60s timeout:</b> {selected_channel}"
                 self.bot.edit_message_text(
-                    channel_text,
+                    f"📺 <b>Selection Timeout</b>\n\n⏰ Auto-selected: {selected_channel}\n\n🚀 Proceeding with upload...",
                     chat_id,
                     message_id,
                     parse_mode='HTML'
                 )
-                time.sleep(2)
+
+                # Clean up
+                if chat_id in self.pending_channel_selections:
+                    del self.pending_channel_selections[chat_id]
+
+                return selected_channel
 
             return selected_channel
 
@@ -736,6 +757,61 @@ Please try again later or contact support if the issue persists.
         except Exception as e:
             log.error(f"Error handling cancel command: {e}")
             self.bot.reply_to(message, "❌ Error cancelling process. Please try again.")
+
+    def _handle_channel_callback(self, call: CallbackQuery):
+        """Handle channel selection button clicks"""
+        try:
+            chat_id = call.message.chat.id
+            message_id = call.message.message_id
+
+            if call.data == "channel_cancel":
+                # User cancelled
+                self.bot.edit_message_text(
+                    "❌ <b>Upload Cancelled</b>\n\nChannel selection cancelled by user.",
+                    chat_id,
+                    message_id,
+                    parse_mode='HTML'
+                )
+
+                # Clean up
+                if chat_id in self.pending_channel_selections:
+                    del self.pending_channel_selections[chat_id]
+
+                self.bot.answer_callback_query(call.id, "Upload cancelled")
+                return
+
+            # Extract channel index
+            if call.data.startswith("channel_"):
+                try:
+                    channel_index = int(call.data.split("_")[1])
+                    selection_data = self.pending_channel_selections.get(chat_id)
+
+                    if selection_data and 0 <= channel_index < len(selection_data['channels']):
+                        selected_channel = selection_data['channels'][channel_index]['name']
+
+                        # Update message to show selection
+                        self.bot.edit_message_text(
+                            f"📺 <b>Channel Selected!</b>\n\n✅ <b>Selected:</b> {selected_channel}\n\n🚀 Proceeding with upload...",
+                            chat_id,
+                            message_id,
+                            parse_mode='HTML'
+                        )
+
+                        # Store the selection
+                        selection_data['selected_channel'] = selected_channel
+                        log.info(f"User selected channel via button: {selected_channel}")
+
+                        self.bot.answer_callback_query(call.id, f"Selected: {selected_channel}")
+                    else:
+                        self.bot.answer_callback_query(call.id, "Invalid selection")
+
+                except (ValueError, IndexError) as e:
+                    log.error(f"Error parsing channel selection: {e}")
+                    self.bot.answer_callback_query(call.id, "Error processing selection")
+
+        except Exception as e:
+            log.error(f"Error handling channel callback: {e}")
+            self.bot.answer_callback_query(call.id, "Error occurred")
 
     def _handle_config_command(self, message: Message):
         """Handle /config command and subcommands"""
@@ -843,11 +919,12 @@ Sensitive values (passwords, emails) are hidden in status displays."""
 
     def _handle_text_message(self, message: Message):
         """Handle text messages"""
-        user_id = message.from_user.id
+        chat_id = message.chat.id
 
-        # Check if user has pending channel selection
-        if user_id in self.pending_channel_selections:
-            self._handle_channel_selection_response(message)
+        # Check if user has pending channel selection (but we're using buttons now, so this is backup)
+        if chat_id in self.pending_channel_selections:
+            # User is in channel selection mode, but we're using buttons now
+            # Just ignore text messages during channel selection
             return
 
         # Default response for other text
