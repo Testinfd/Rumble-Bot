@@ -496,9 +496,9 @@ Please try again later or contact support if the issue persists.
     def _handle_config_command(self, message: Message):
         """Handle /config command and subcommands"""
         try:
-            # Parse command arguments
+            # Parse command arguments - handle extra spaces
             text = message.text.strip()
-            parts = text.split()
+            parts = [part for part in text.split() if part]  # Remove empty parts
 
             if len(parts) == 1:  # Just "/config"
                 response = self.env_manager.get_setup_instructions()
@@ -508,24 +508,23 @@ Please try again later or contact support if the issue persists.
 
                 if subcommand == 'status':
                     status = self.env_manager.get_configuration_status()
-                    response = f"""
-🔧 **Environment Configuration Status**
+                    response = f"""🔧 <b>Environment Configuration Status</b>
 
-**Configured Variables:** {status['configured_count']}/{status['total_vars']}
+<b>Configured Variables:</b> {status['configured_count']}/{status['total_vars']}
 
 """
                     if status['configured']:
-                        response += "**✅ Configured:**\n"
+                        response += "<b>✅ Configured:</b>\n"
                         for var_name, var_info in status['configured'].items():
-                            response += f"• **{var_name}**: {var_info['value']}\n"
+                            response += f"• <b>{var_name}</b>: {var_info['value']}\n"
 
                     if status['missing']:
-                        response += "\n**❌ Missing Required:**\n"
+                        response += "\n<b>❌ Missing Required:</b>\n"
                         for var in status['missing']:
-                            response += f"• **{var['name']}**: {var['description']}\n"
+                            response += f"• <b>{var['name']}</b>: {var['description']}\n"
 
                     if not status['missing']:
-                        response += "\n✅ **All required variables configured!**"
+                        response += "\n✅ <b>All required variables configured!</b>"
 
                 elif subcommand == 'setup':
                     response = self.env_manager.get_setup_instructions()
@@ -534,29 +533,27 @@ Please try again later or contact support if the issue persists.
                     response = self.env_manager.get_variable_list()
 
                 elif subcommand == 'help':
-                    response = """
-🔧 **Configuration Help**
+                    response = """🔧 <b>Configuration Help</b>
 
-**Available Commands:**
-• `/config status` - View current configuration
-• `/config setup` - Get setup instructions
-• `/config list` - List all configurable variables
-• `/config set VAR value` - Set environment variable
-• `/config help` - Show this help
+<b>Available Commands:</b>
+• <code>/config status</code> - View current configuration
+• <code>/config setup</code> - Get setup instructions
+• <code>/config list</code> - List all configurable variables
+• <code>/config set VAR value</code> - Set environment variable
+• <code>/config help</code> - Show this help
 
-**Setting Variables:**
-Use `/config set VARIABLE_NAME value` format.
+<b>Setting Variables:</b>
+Use <code>/config set VARIABLE_NAME value</code> format.
 
-**Examples:**
-• `/config set RUMBLE_EMAIL your@email.com`
-• `/config set RUMBLE_PASSWORD yourpassword`
-• `/config set RUMBLE_CHANNEL "Your Channel"`
-• `/config set MAX_FILE_SIZE_MB 1024`
-• `/config set HEADLESS_MODE true`
+<b>Examples:</b>
+• <code>/config set RUMBLE_EMAIL your@email.com</code>
+• <code>/config set RUMBLE_PASSWORD yourpassword</code>
+• <code>/config set RUMBLE_CHANNEL "Your Channel"</code>
+• <code>/config set MAX_FILE_SIZE_MB 1024</code>
+• <code>/config set HEADLESS_MODE true</code>
 
-**⚠️ Security:**
-Sensitive values (passwords, emails) are hidden in status displays.
-                    """
+<b>⚠️ Security:</b>
+Sensitive values (passwords, emails) are hidden in status displays."""
 
                 else:
                     response = f"❌ Unknown subcommand: {subcommand}\nUse `/config help` for available commands."
@@ -569,12 +566,12 @@ Sensitive values (passwords, emails) are hidden in status displays.
                 response = message
 
                 if success:
-                    response += "\n\n💡 **Note:** Changes take effect immediately for new operations."
+                    response += "\n\n💡 <b>Note:</b> Changes take effect immediately for new operations."
 
             else:
                 response = "❌ Invalid command format.\nUse `/config help` for usage instructions."
 
-            self.bot.reply_to(message, response, parse_mode='Markdown')
+            self.bot.reply_to(message, response, parse_mode='HTML')
             log.info(f"Handled config command from user {message.from_user.id}")
 
         except Exception as e:

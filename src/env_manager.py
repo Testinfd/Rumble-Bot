@@ -202,55 +202,50 @@ class EnvironmentManager:
     def get_setup_instructions(self) -> str:
         """Get setup instructions for configuration"""
         status = self.get_configuration_status()
-        
+
         if not status['missing']:
-            return """
-✅ **Configuration Complete!**
+            return """✅ <b>Configuration Complete!</b>
 
 All required environment variables are configured.
-Use `/config status` to view current settings.
-            """
-        
-        instructions = """
-🔧 **Environment Configuration Setup**
+Use <code>/config status</code> to view current settings."""
 
-**Missing Required Variables:**
-"""
-        
+        instructions = """🔧 <b>Environment Configuration Setup</b>
+
+<b>Missing Required Variables:</b>"""
+
         for var in status['missing']:
-            instructions += f"\n• **{var['name']}**: {var['description']}"
-        
+            instructions += f"\n• <b>{var['name']}</b>: {var['description']}"
+
         instructions += """
 
-**To configure a variable, use:**
-`/config set VARIABLE_NAME value`
+<b>To configure a variable, use:</b>
+<code>/config set VARIABLE_NAME value</code>
 
-**Examples:**
-• `/config set RUMBLE_EMAIL your@email.com`
-• `/config set RUMBLE_PASSWORD yourpassword`
-• `/config set RUMBLE_CHANNEL "Your Channel Name"`
+<b>Examples:</b>
+• <code>/config set RUMBLE_EMAIL your@email.com</code>
+• <code>/config set RUMBLE_PASSWORD yourpassword</code>
+• <code>/config set RUMBLE_CHANNEL "Your Channel Name"</code>
 
-**Available Commands:**
-• `/config status` - View current configuration
-• `/config list` - List all configurable variables
-• `/config set VAR value` - Set a variable
-• `/config help` - Show this help
+<b>Available Commands:</b>
+• <code>/config status</code> - View current configuration
+• <code>/config list</code> - List all configurable variables
+• <code>/config set VAR value</code> - Set a variable
+• <code>/config help</code> - Show this help
 
-**⚠️ Security Note:**
-Sensitive data (passwords, emails) will be hidden in status displays.
-        """
-        
+<b>⚠️ Security Note:</b>
+Sensitive data (passwords, emails) will be hidden in status displays."""
+
         return instructions
     
     def get_variable_list(self) -> str:
         """Get list of all configurable variables"""
-        var_list = "🔧 **Configurable Environment Variables:**\n\n"
-        
+        var_list = "🔧 <b>Configurable Environment Variables:</b>\n\n"
+
         for var_name, var_config in self.configurable_vars.items():
-            required_text = "**Required**" if var_config['required'] else "Optional"
+            required_text = "<b>Required</b>" if var_config['required'] else "Optional"
             default_text = f" (Default: {var_config.get('default', 'None')})" if 'default' in var_config else ""
-            
-            var_list += f"• **{var_name}**: {var_config['description']}\n"
+
+            var_list += f"• <b>{var_name}</b>: {var_config['description']}\n"
             var_list += f"  Type: {var_config['type']} | {required_text}{default_text}\n\n"
-        
+
         return var_list
