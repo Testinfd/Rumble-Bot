@@ -65,7 +65,7 @@ class RumbleBot:
         def handle_video(message: Message):
             self._handle_video_message(message)
 
-        @self.bot.message_handler(func=lambda message: True)
+        @self.bot.message_handler(func=lambda message: True and not message.text.startswith('/config'))
         def handle_text(message: Message):
             self._handle_text_message(message)
     
@@ -118,6 +118,12 @@ It can be multiple lines.
 • Progress Updates: {'Enabled' if config.ENABLE_PROGRESS_UPDATES else 'Disabled'}
 • Debug Info: {'Enabled' if config.ENABLE_DEBUG_INFO else 'Disabled'}
 • Random Content: {'Enabled' if config.ENABLE_RANDOM_TITLES else 'Disabled'}
+
+**💡 Upload Tips:**
+• For large videos (>50 MB): Send as **document/file** instead of video
+• Supports videos up to 2 GB when sent as documents
+• MP4, AVI, MOV, and other video formats supported
+• Add custom title/description in the file caption
 
 Ready to upload your videos with enhanced experience! 🎉
         """
@@ -323,33 +329,43 @@ For help with configuration, contact your administrator.
                 if video and hasattr(video, 'file_size'):
                     file_size_mb = video.file_size / (1024 * 1024)
                     if file_size_mb > config.MAX_FILE_SIZE_MB:
-                        error_text = f"""
-❌ **Video Too Large**
+                        error_text = f"""❌ <b>Video Too Large</b>
 
 Your video ({file_size_mb:.1f} MB) exceeds the maximum size limit of {config.MAX_FILE_SIZE_MB} MB.
 
-**Solutions:**
+<b>Solutions:</b>
 • Compress your video using a video editor
 • Upload a shorter clip
 • Reduce video quality/resolution
 • Try online video compressors
 
-**Tip**: Most phones can compress videos in their gallery apps.
-                        """
+<b>Tip:</b> Most phones can compress videos in their gallery apps."""
                     else:
-                        error_text = """
-❌ **Download Failed**
+                        error_text = """❌ <b>Download Failed</b>
 
 Unable to download your video. This could be due to:
 • Temporary network issues
 • File format not supported
 • Telegram API limitations
 
-**Please try:**
-• Uploading the video again
-• Converting to MP4 format
-• Checking your internet connection
-                        """
+<b>Please try:</b>
+• Send as **document/file** instead of video (supports larger files)
+• Upload the video again
+• Convert to MP4 format
+• Check your internet connection"""
+                else:
+                    # No file size info available - likely too big for Telegram
+                    error_text = """❌ <b>File Too Large</b>
+
+Your video is too large for Telegram to process (over 50 MB limit).
+
+<b>Solutions:</b>
+• **Send as document/file** instead of video (supports up to 2 GB)
+• Compress your video to under 50 MB
+• Upload a shorter clip
+• Reduce video quality/resolution
+
+<b>💡 Best Solution:</b> Use the document/file option in Telegram for large videos!"""
                 else:
                     error_text = "❌ Failed to download video. Please try again with a different file."
 
@@ -639,12 +655,15 @@ Sensitive values (passwords, emails) are hidden in status displays."""
     def _process_video_file(self, message: Message) -> Optional[str]:
         """Process and download video file"""
         try:
-            if message.video:
-                file_info = self.bot.get_file(message.video.file_id)
-                file_size = message.video.file_size
-            elif message.document and message.document.mime_type and 'video' in message.document.mime_type:
+            # Prioritize document uploads (higher file size limit)
+            if message.document and message.document.mime_type and 'video' in message.document.mime_type:
                 file_info = self.bot.get_file(message.document.file_id)
                 file_size = message.document.file_size
+                log.info(f"Processing video as document: {file_size / (1024*1024):.1f} MB")
+            elif message.video:
+                file_info = self.bot.get_file(message.video.file_id)
+                file_size = message.video.file_size
+                log.info(f"Processing video message: {file_size / (1024*1024):.1f} MB")
             else:
                 log.warning("Unsupported file type received")
                 return None
