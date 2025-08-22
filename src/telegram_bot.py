@@ -816,38 +816,41 @@ Sensitive values (passwords, emails) are hidden in status displays."""
 
             log.info(f"Media downloaded successfully: {file_path}")
 
-            # Convert video to ensure Rumble compatibility
-            if processing_msg:
-                try:
-                    self.bot.edit_message_text(
-                        f"📹 Media downloaded!\n\n🔄 Converting to Rumble-compatible format...",
-                        processing_msg.chat.id,
-                        processing_msg.message_id
-                    )
-                except Exception as e:
-                    log.warning(f"Failed to update progress message: {e}")
-
-            converted_path = self._convert_video_for_rumble(file_path)
-            if converted_path and converted_path != str(file_path):
-                # Remove original file if conversion was successful
-                try:
-                    os.remove(file_path)
-                    log.info(f"Removed original file after conversion: {file_path}")
-                except Exception as e:
-                    log.warning(f"Failed to remove original file: {e}")
-                return converted_path
-            elif converted_path is None:
-                # Conversion failed, but continue with original file
-                log.warning("Video conversion failed, proceeding with original file")
+            # Convert video to ensure Rumble compatibility (optional)
+            if config.ENABLE_VIDEO_CONVERSION:
                 if processing_msg:
                     try:
                         self.bot.edit_message_text(
-                            f"📹 Media downloaded!\n\n⚠️ Conversion failed, using original format...",
+                            f"📹 Media downloaded!\n\n🔄 Converting to Rumble-compatible format...",
                             processing_msg.chat.id,
                             processing_msg.message_id
                         )
                     except Exception as e:
                         log.warning(f"Failed to update progress message: {e}")
+
+                converted_path = self._convert_video_for_rumble(file_path)
+                if converted_path and converted_path != str(file_path):
+                    # Remove original file if conversion was successful
+                    try:
+                        os.remove(file_path)
+                        log.info(f"Removed original file after conversion: {file_path}")
+                    except Exception as e:
+                        log.warning(f"Failed to remove original file: {e}")
+                    return converted_path
+                elif converted_path is None:
+                    # Conversion failed, but continue with original file
+                    log.warning("Video conversion failed, proceeding with original file")
+                    if processing_msg:
+                        try:
+                            self.bot.edit_message_text(
+                                f"📹 Media downloaded!\n\n⚠️ Conversion failed, using original format...",
+                                processing_msg.chat.id,
+                                processing_msg.message_id
+                            )
+                        except Exception as e:
+                            log.warning(f"Failed to update progress message: {e}")
+            else:
+                log.info("Video conversion disabled, using original format")
 
             return str(file_path)
             

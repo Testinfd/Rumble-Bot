@@ -53,6 +53,7 @@ class Config:
     # Telegram Bot Features
     ENABLE_PROGRESS_UPDATES: bool = os.getenv("ENABLE_PROGRESS_UPDATES", "true").lower() == "true"
     ENABLE_DEBUG_INFO: bool = os.getenv("ENABLE_DEBUG_INFO", "true").lower() == "true"
+    ENABLE_VIDEO_CONVERSION: bool = os.getenv("ENABLE_VIDEO_CONVERSION", "false").lower() == "true"
     
     # Directories
     DOWNLOADS_DIR: str = "downloads"
