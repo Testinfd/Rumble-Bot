@@ -540,9 +540,15 @@ Please try again later or contact support if the issue persists.
             available_channels = self.rumble_uploader.get_available_channels()
             selected_channel = None
 
-            if available_channels:
+            if available_channels and len(available_channels) > 1:
                 # Ask user to select channel
                 selected_channel = self._ask_user_for_channel_selection(chat_id, available_channels, message_id)
+            elif available_channels:
+                # Only one channel available, use it
+                selected_channel = available_channels[0]['name']
+                log.info(f"Only one channel available, auto-selecting: {selected_channel}")
+            else:
+                log.warning("No channels found, will use default")
 
             # Actual upload
             upload_result = self.rumble_uploader.upload_video(
@@ -564,28 +570,41 @@ Please try again later or contact support if the issue persists.
         """Ask user to select a channel from available options"""
         try:
             # Create channel selection message
-            channel_text = "📺 **Select Upload Channel:**\n\n"
+            channel_text = "📺 <b>Select Upload Channel:</b>\n\n"
             for i, channel in enumerate(available_channels, 1):
                 channel_text += f"{i}. {channel['name']}\n"
 
-            channel_text += f"\n💬 Reply with the number (1-{len(available_channels)}) to select your channel:"
+            # For now, let's show the options and auto-select "Ruslan Belov" if available
+            log.info(f"Available channels: {[ch['name'] for ch in available_channels]}")
+
+            # Look for "Ruslan Belov" channel
+            ruslan_channel = None
+            for channel in available_channels:
+                if "Ruslan Belov" in channel['name']:
+                    ruslan_channel = channel['name']
+                    break
+
+            if ruslan_channel:
+                selected_channel = ruslan_channel
+                channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel}"
+                log.info(f"Found and selected 'Ruslan Belov' channel: {selected_channel}")
+            else:
+                # Default to first channel
+                selected_channel = available_channels[0]['name']
+                channel_text += f"\n✅ <b>Auto-selected:</b> {selected_channel} (default)"
+                log.info(f"'Ruslan Belov' not found, using first channel: {selected_channel}")
 
             # Send channel selection message
             self.bot.edit_message_text(
                 channel_text,
                 chat_id,
                 message_id,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
 
-            # Wait for user response (simplified - in real implementation you'd use a callback)
-            # For now, return the first channel as default
-            log.info(f"Available channels: {[ch['name'] for ch in available_channels]}")
-
-            # TODO: Implement proper user selection mechanism
-            # For now, use the first available channel
-            selected_channel = available_channels[0]['name']
-            log.info(f"Auto-selecting first channel: {selected_channel}")
+            # Give user a moment to see the selection
+            import time
+            time.sleep(3)
 
             return selected_channel
 

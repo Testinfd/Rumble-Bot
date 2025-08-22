@@ -671,6 +671,11 @@ class RumbleUploader:
     def get_available_channels(self) -> list:
         """Get list of available channels for user selection"""
         try:
+            # Make sure we're logged in first
+            if not hasattr(self, 'driver') or not self.driver:
+                self._setup_driver()
+                self.login()
+
             # Navigate to upload page to see channels
             self.driver.get("https://rumble.com/upload.php")
             self._human_delay(2, 3)
@@ -684,12 +689,13 @@ class RumbleUploader:
                 if channel_text:
                     # Get the associated radio button ID
                     for_attr = label.get_attribute('for')
-                    available_channels.append({
-                        'name': channel_text,
-                        'id': for_attr
-                    })
+                    if for_attr:  # Make sure for_attr exists
+                        available_channels.append({
+                            'name': channel_text,
+                            'id': for_attr
+                        })
 
-            log.info(f"Found {len(available_channels)} available channels")
+            log.info(f"Found {len(available_channels)} available channels: {[ch['name'] for ch in available_channels]}")
             return available_channels
 
         except Exception as e:
