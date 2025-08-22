@@ -61,11 +61,11 @@ class RumbleBot:
         def handle_config(message: Message):
             self._handle_config_command(message)
 
-        @self.bot.message_handler(content_types=['video', 'document'])
-        def handle_video(message: Message):
+        @self.bot.message_handler(content_types=['video', 'document', 'audio', 'photo'])
+        def handle_media(message: Message):
             self._handle_video_message(message)
 
-        @self.bot.message_handler(func=lambda message: True and not message.text.startswith('/config'))
+        @self.bot.message_handler(func=lambda message: True and not (hasattr(message, 'text') and message.text and message.text.startswith('/config')))
         def handle_text(message: Message):
             self._handle_text_message(message)
     
@@ -264,12 +264,12 @@ For help with configuration, contact your administrator.
 
     @error_handler.retry_on_failure(max_attempts=3, delay=5)
     def _handle_video_message(self, message: Message):
-        """Handle video file messages with detailed progress updates"""
+        """Handle media file messages (video, document, audio, photo) with detailed progress updates"""
         try:
-            # Check file size first
-            video = message.video or message.document
-            if video and hasattr(video, 'file_size'):
-                file_size_mb = video.file_size / (1024 * 1024)
+            # Check file size first for any media type
+            media = message.video or message.document or message.audio or (message.photo[-1] if message.photo else None)
+            if media and hasattr(media, 'file_size'):
+                file_size_mb = media.file_size / (1024 * 1024)
                 max_size_mb = config.MAX_FILE_SIZE_MB
 
                 if file_size_mb > max_size_mb:
@@ -620,7 +620,7 @@ Sensitive values (passwords, emails) are hidden in status displays."""
         # Default response for other text
         self.bot.reply_to(
             message,
-            "📹 Please send a video file to upload to Rumble.\n\nUse /help for more information."
+            "📹 Please send a video file to upload to Rumble.\n\n💡 **For large videos (>50 MB)**: Send as **📄 Document/File** instead of 🎥 Video for better success rate.\n\nUse /help for more information."
         )
     
     def _extract_metadata(self, text: str) -> Tuple[Optional[str], Optional[str], List[str]]:
@@ -651,7 +651,7 @@ Sensitive values (passwords, emails) are hidden in status displays."""
         return title, description, tags
     
     def _process_video_file(self, message: Message) -> Optional[str]:
-        """Process and download video file using direct Telegram API approach"""
+        """Download any media content from message - simplified approach"""
         try:
             # Check available disk space first
             import shutil
@@ -663,23 +663,44 @@ Sensitive values (passwords, emails) are hidden in status displays."""
                 log.error(f"Insufficient disk space: {free_mb:.1f} MB available")
                 return None
 
-            # Get file info - prioritize document uploads (higher file size limit)
-            if message.document and message.document.mime_type and 'video' in message.document.mime_type:
+            # Simple approach: just download whatever media is in the message
+            # Let Telegram handle file size limits and let Rumble handle file type validation
+
+            # Determine file info from any media type
+            file_id = None
+            file_size = 0
+            file_name = f"media_{int(time.time())}"
+
+            if message.document:
                 file_id = message.document.file_id
-                file_size = message.document.file_size
-                file_name = message.document.file_name or f"video_{int(time.time())}.mp4"
-                log.info(f"Processing video as document: {file_size / (1024*1024):.1f} MB")
+                file_size = message.document.file_size or 0
+                file_name = message.document.file_name or f"document_{int(time.time())}"
+                log.info(f"Processing document: {file_name} ({file_size / (1024*1024):.1f} MB)")
             elif message.video:
                 file_id = message.video.file_id
-                file_size = message.video.file_size
+                file_size = message.video.file_size or 0
                 file_name = f"video_{int(time.time())}.mp4"
-                log.info(f"Processing video message: {file_size / (1024*1024):.1f} MB")
+                log.info(f"Processing video: {file_name} ({file_size / (1024*1024):.1f} MB)")
+            elif message.audio:
+                file_id = message.audio.file_id
+                file_size = message.audio.file_size or 0
+                file_name = f"audio_{int(time.time())}.mp3"
+                log.info(f"Processing audio: {file_name} ({file_size / (1024*1024):.1f} MB)")
+            elif message.photo:
+                # Get the largest photo size
+                file_id = message.photo[-1].file_id
+                file_size = message.photo[-1].file_size or 0
+                file_name = f"photo_{int(time.time())}.jpg"
+                log.info(f"Processing photo: {file_name} ({file_size / (1024*1024):.1f} MB)")
             else:
-                log.warning("Unsupported file type received")
+                log.warning("No media content found in message")
                 return None
 
-            # Don't artificially limit file size - let Telegram handle it
-            log.info(f"Downloading file: {file_name} ({file_size / (1024*1024):.1f} MB)")
+            if not file_id:
+                log.warning("Could not get file_id from message")
+                return None
+
+            log.info(f"Downloading media: {file_name}")
 
             # Use Telegram's direct download approach
             file_info = self.bot.get_file(file_id)
@@ -705,11 +726,11 @@ Sensitive values (passwords, emails) are hidden in status displays."""
                             downloaded += len(chunk)
 
                             # Log progress for large files
-                            if downloaded % (10 * 1024 * 1024) == 0:  # Every 10 MB
-                                progress = (downloaded / file_size) * 100 if file_size else 0
+                            if file_size > 0 and downloaded % (10 * 1024 * 1024) == 0:  # Every 10 MB
+                                progress = (downloaded / file_size) * 100
                                 log.info(f"Download progress: {downloaded / (1024*1024):.1f} MB ({progress:.1f}%)")
 
-            log.info(f"Video downloaded successfully: {file_path}")
+            log.info(f"Media downloaded successfully: {file_path}")
             return str(file_path)
             
         except Exception as e:
