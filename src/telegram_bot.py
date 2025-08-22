@@ -651,38 +651,64 @@ Sensitive values (passwords, emails) are hidden in status displays."""
         return title, description, tags
     
     def _process_video_file(self, message: Message) -> Optional[str]:
-        """Process and download video file"""
+        """Process and download video file using direct Telegram API approach"""
         try:
-            # Prioritize document uploads (higher file size limit)
+            # Check available disk space first
+            import shutil
+            total, used, free = shutil.disk_usage("/")
+            free_mb = free / (1024 * 1024)
+            log.info(f"Available disk space: {free_mb:.1f} MB")
+
+            if free_mb < 200:  # Require at least 200 MB free
+                log.error(f"Insufficient disk space: {free_mb:.1f} MB available")
+                return None
+
+            # Get file info - prioritize document uploads (higher file size limit)
             if message.document and message.document.mime_type and 'video' in message.document.mime_type:
-                file_info = self.bot.get_file(message.document.file_id)
+                file_id = message.document.file_id
                 file_size = message.document.file_size
+                file_name = message.document.file_name or f"video_{int(time.time())}.mp4"
                 log.info(f"Processing video as document: {file_size / (1024*1024):.1f} MB")
             elif message.video:
-                file_info = self.bot.get_file(message.video.file_id)
+                file_id = message.video.file_id
                 file_size = message.video.file_size
+                file_name = f"video_{int(time.time())}.mp4"
                 log.info(f"Processing video message: {file_size / (1024*1024):.1f} MB")
             else:
                 log.warning("Unsupported file type received")
                 return None
-            
-            # Check file size
-            max_size_bytes = config.MAX_FILE_SIZE_MB * 1024 * 1024
-            if file_size and file_size > max_size_bytes:
-                log.warning(f"File too large: {file_size} bytes")
-                return None
-            
-            # Download file
-            downloaded_file = self.bot.download_file(file_info.file_path)
-            
-            # Save to downloads directory
-            file_extension = Path(file_info.file_path).suffix or '.mp4'
-            filename = f"video_{int(time.time())}{file_extension}"
-            file_path = Path(config.DOWNLOADS_DIR) / filename
-            
-            with open(file_path, 'wb') as f:
-                f.write(downloaded_file)
-            
+
+            # Don't artificially limit file size - let Telegram handle it
+            log.info(f"Downloading file: {file_name} ({file_size / (1024*1024):.1f} MB)")
+
+            # Use Telegram's direct download approach
+            file_info = self.bot.get_file(file_id)
+
+            # Create file path
+            file_path = Path(config.DOWNLOADS_DIR) / file_name
+
+            # Download file directly using requests for better control
+            import requests
+            download_url = f"https://api.telegram.org/file/bot{self.bot.token}/{file_info.file_path}"
+
+            log.info(f"Downloading from: {download_url}")
+
+            # Stream download to handle large files efficiently
+            with requests.get(download_url, stream=True) as response:
+                response.raise_for_status()
+
+                with open(file_path, 'wb') as f:
+                    downloaded = 0
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+
+                            # Log progress for large files
+                            if downloaded % (10 * 1024 * 1024) == 0:  # Every 10 MB
+                                progress = (downloaded / file_size) * 100 if file_size else 0
+                                log.info(f"Download progress: {downloaded / (1024*1024):.1f} MB ({progress:.1f}%)")
+
             log.info(f"Video downloaded successfully: {file_path}")
             return str(file_path)
             
@@ -693,11 +719,20 @@ Sensitive values (passwords, emails) are hidden in status displays."""
             # Provide specific error feedback
             if "file is too big" in error_msg.lower():
                 log.warning(f"File size exceeded Telegram's limit for user {message.from_user.id}")
-                # This error is already handled in the main handler
             elif "bad request" in error_msg.lower():
                 log.warning(f"Bad request error for user {message.from_user.id}: {error_msg}")
+            elif "requests" in error_msg.lower() or "connection" in error_msg.lower():
+                log.warning(f"Network error during download for user {message.from_user.id}: {error_msg}")
             else:
                 log.error(f"Unexpected download error for user {message.from_user.id}: {error_msg}")
+
+            # Clean up partial file if it exists
+            try:
+                if 'file_path' in locals() and os.path.exists(file_path):
+                    os.remove(file_path)
+                    log.info(f"Cleaned up partial download: {file_path}")
+            except Exception as cleanup_error:
+                log.warning(f"Failed to clean up partial file: {cleanup_error}")
 
             return None
     
